@@ -24,10 +24,11 @@ const INITIAL_INVENTORY = [
   { id: '2', name: "Mozzarella Cheese", stock: 20, unit: "kg", threshold: 5, cost: 250 },
   { id: '3', name: "Tomato Sauce", stock: 15, unit: "liters", threshold: 5, cost: 100 },
   { id: '4', name: "Pepperoni", stock: 10, unit: "kg", threshold: 2, cost: 120 },
-  { id: '5', name: "Mushrooms", stock: 5, unit: "kg", threshold: 1, cost: 400 },
+  { id: '5', name: "Beverages", stock: 15, unit: "liters", threshold: 10, cost: 100 },
   { id: '6', name: "Olives", stock: 3, unit: "kg", threshold: 2, cost: 700 },
   { id: '7', name: "Onions", stock: 10, unit: "kg", threshold: 3, cost: 150 },
   { id: '8', name: "Green Peppers", stock: 7, unit: "kg", threshold: 2, cost: 350 },
+  { id: '9', name: "Pizza Boxes", stock: 70, unit: "units", threshold: 20, cost: 50 },
 ];
 
 const Modal = ({ show, onClose, title, children }) => {
@@ -379,7 +380,7 @@ export default function PizzaInventorySystem() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">🍕 Toss in F11 - Inventory Manager</h1>
-          <p className="text-gray-600">AI-powered inventory management for your pizza restaurant</p>
+          <p className="text-gray-600">AI-powered Inventory Management for your Pizza Restaurant</p>
         </div>
 
         <Dashboard inventory={inventory} />
