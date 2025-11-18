@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Boxes, 
   Plus, 
@@ -13,6 +13,12 @@ import {
   DollarSign
 } from 'lucide-react';
 
+// Request notification permission when app loads
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+// Sample inventory data with costs
 const INITIAL_INVENTORY = [
   { id: '1', name: "Pizza Dough", stock: 50, unit: "units", threshold: 10, cost: 1000 },
   { id: '2', name: "Mozzarella Cheese", stock: 20, unit: "kg", threshold: 5, cost: 250 },
@@ -275,10 +281,74 @@ const Dashboard = ({ inventory }) => {
   );
 };
 
+const LowStockAlertPanel = ({ inventory }) => {
+  const lowStockItems = inventory.filter(item => item.stock < item.threshold);
+  
+  if (lowStockItems.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg shadow-lg animate-pulse">
+      <div className="flex items-center mb-3">
+        <AlertTriangle className="text-red-500 mr-2" size={24} />
+        <h3 className="text-lg font-semibold text-red-800">
+          ⚠️ Low Stock Alerts ({lowStockItems.length})
+        </h3>
+      </div>
+      <div className="space-y-2">
+        {lowStockItems.map(item => (
+          <div key={item.id} className="bg-white p-3 rounded-md flex justify-between items-center">
+            <div>
+              <span className="font-semibold text-gray-800">{item.name}</span>
+              <span className="text-sm text-gray-600 ml-2">
+                ({item.stock} {item.unit} remaining - needs {item.threshold} {item.unit})
+              </span>
+            </div>
+            <span className="bg-red-100 text-red-800 text-xs font-semibold px-3 py-1 rounded-full">
+              Restock Needed
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function PizzaInventorySystem() {
   const [inventory, setInventory] = useState(INITIAL_INVENTORY);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [notifiedItems, setNotifiedItems] = useState(new Set());
+
+  // Check for low stock and send notifications
+  useEffect(() => {
+    const lowStockItems = inventory.filter(item => item.stock < item.threshold);
+    
+    lowStockItems.forEach(item => {
+      // Only notify once per item until stock is restocked
+      if (!notifiedItems.has(item.id) && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('🍕 Low Stock Alert!', {
+          body: `${item.name} is running low! Only ${item.stock} ${item.unit} left (threshold: ${item.threshold} ${item.unit})`,
+          icon: '🍕',
+          tag: item.id,
+        });
+        
+        setNotifiedItems(prev => new Set([...prev, item.id]));
+      }
+    });
+    
+    // Reset notification if stock is restocked
+    inventory.forEach(item => {
+      if (item.stock >= item.threshold && notifiedItems.has(item.id)) {
+        setNotifiedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(item.id);
+          return newSet;
+        });
+      }
+    });
+  }, [inventory, notifiedItems]);
 
   const handleUpdateStock = (id, updates) => {
     setInventory(prev => prev.map(item => 
@@ -309,10 +379,12 @@ export default function PizzaInventorySystem() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">🍕 Toss in F11 - Inventory Manager</h1>
-          <p className="text-gray-600">AI-powered Inventory Management for your Toss Restaurant</p>
+          <p className="text-gray-600">AI-powered inventory management for your pizza restaurant</p>
         </div>
 
         <Dashboard inventory={inventory} />
+        
+        <LowStockAlertPanel inventory={inventory} />
 
         <AIAgentInput inventory={inventory} onUpdateStock={handleUpdateStock} />
 
