@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 const INITIAL_INVENTORY = [
-  { id: '1', name: "Pizza Dough", stock: 50, unit: "units", threshold: 10, cost: 10000 },
+  { id: '1', name: "Pizza Dough", stock: 50, unit: "units", threshold: 10, cost: 1000 },
   { id: '2', name: "Mozzarella Cheese", stock: 20, unit: "kg", threshold: 5, cost: 250 },
   { id: '3', name: "Tomato Sauce", stock: 15, unit: "liters", threshold: 5, cost: 100 },
   { id: '4', name: "Pepperoni", stock: 10, unit: "kg", threshold: 2, cost: 120 },
