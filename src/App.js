@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Boxes, 
   Plus, 
@@ -10,7 +11,12 @@ import {
   Send,
   MessageSquare,
   Edit,
-  DollarSign
+  DollarSign,
+  Search,        
+  Filter,        
+  Download,      
+  FileSpreadsheet, 
+  FileText       
 } from 'lucide-react';
 
 // Request notification permission when app loads
@@ -282,6 +288,219 @@ const Dashboard = ({ inventory }) => {
   );
 };
 
+const SearchAndFilter = ({ inventory, onFilterChange, searchTerm, setSearchTerm, filterType, setFilterType }) => {
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-lg mb-6">
+      <div className="flex flex-col md:flex-row gap-4">
+        {/* Search Bar */}
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search items by name..."
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Filter Dropdown */}
+        <div className="md:w-64">
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+            >
+              <option value="all">All Items</option>
+              <option value="lowStock">Low Stock Only</option>
+              <option value="inStock">In Stock</option>
+              <option value="highValue">High Value (Rs. 100+)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Sort Dropdown */}
+        <div className="md:w-64">
+          <select
+            onChange={(e) => onFilterChange(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+          >
+            <option value="name-asc">Sort: A to Z</option>
+            <option value="name-desc">Sort: Z to A</option>
+            <option value="stock-asc">Sort: Stock Low to High</option>
+            <option value="stock-desc">Sort: Stock High to Low</option>
+            <option value="value-asc">Sort: Value Low to High</option>
+            <option value="value-desc">Sort: Value High to Low</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Active Filters Display */}
+      {(searchTerm || filterType !== 'all') && (
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-sm text-gray-600">Active filters:</span>
+          {searchTerm && (
+            <span className="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full flex items-center gap-1">
+              Search: "{searchTerm}"
+              <button onClick={() => setSearchTerm('')} className="hover:bg-blue-200 rounded-full p-0.5">
+                <X size={12} />
+              </button>
+            </span>
+          )}
+          {filterType !== 'all' && (
+            <span className="bg-purple-100 text-purple-800 text-xs px-3 py-1 rounded-full flex items-center gap-1">
+              {filterType === 'lowStock' && 'Low Stock'}
+              {filterType === 'inStock' && 'In Stock'}
+              {filterType === 'highValue' && 'High Value'}
+              <button onClick={() => setFilterType('all')} className="hover:bg-purple-200 rounded-full p-0.5">
+                <X size={12} />
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ExportButtons = ({ inventory, isXlsxLoaded }) => { // Added isXlsxLoaded prop
+  const exportToExcel = () => {
+    // Check if the library is loaded
+    if (!isXlsxLoaded || !window.XLSX) {
+      console.error('XLSX library is not loaded yet.');
+      alert('Excel export feature is still loading. Please try again in a moment.');
+      return;
+    }
+
+    // Prepare data for export
+    const exportData = inventory.map(item => ({
+      'Item Name': item.name,
+      'Stock': item.stock,
+      'Unit': item.unit,
+      'Cost per Unit (Rs.)': item.cost,
+      'Total Value (Rs.)': (item.stock * item.cost).toFixed(2),
+      'Threshold': item.threshold,
+      'Status': item.stock < item.threshold ? 'Low Stock' : 'In Stock'
+    }));
+
+    // Create worksheet
+    const ws = window.XLSX.utils.json_to_sheet(exportData); // Use window.XLSX
+    const wb = window.XLSX.utils.book_new(); // Use window.XLSX
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Inventory'); // Use window.XLSX
+
+    // Add summary
+    const summary = [
+      {},
+      { 'Item Name': 'SUMMARY' },
+      { 'Item Name': 'Total Items', 'Stock': inventory.length },
+      { 'Item Name': 'Low Stock Items', 'Stock': inventory.filter(i => i.stock < i.threshold).length },
+      { 'Item Name': 'Total Inventory Value', 'Stock': `Rs. ${inventory.reduce((sum, i) => sum + (i.stock * i.cost), 0).toFixed(2)}` }
+    ];
+    window.XLSX.utils.sheet_add_json(ws, summary, { skipHeader: true, origin: -1 }); // Use window.XLSX
+
+    // Save file
+    window.XLSX.writeFile(wb, `Inventory_${new Date().toISOString().split('T')[0]}.xlsx`); // Use window.XLSX
+  };
+
+  const exportToPDF = () => {
+    // Create printable HTML content
+    const printWindow = window.open('', '', 'width=800,height=600');
+    
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Inventory Report - Toss in F11</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #2d3748; border-bottom: 3px solid #48bb78; padding-bottom: 10px; }
+          .summary { background: #f7fafc; padding: 15px; margin: 20px 0; border-radius: 8px; }
+          .summary-item { display: inline-block; margin-right: 30px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #48bb78; color: white; padding: 12px; text-align: left; }
+          td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
+          tr:nth-child(even) { background: #f7fafc; }
+          .low-stock { background: #fed7d7 !important; font-weight: bold; }
+          .footer { margin-top: 30px; text-align: center; color: #718096; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <h1>🍕 Toss in F11 - Inventory Report</h1>
+        <p>Generated on: ${new Date().toLocaleString()}</p>
+        
+        <div class="summary">
+          <div class="summary-item"><strong>Total Items:</strong> ${inventory.length}</div>
+          <div class="summary-item"><strong>Low Stock Items:</strong> ${inventory.filter(i => i.stock < i.threshold).length}</div>
+          <div class="summary-item"><strong>Total Value:</strong> Rs. ${inventory.reduce((sum, i) => sum + (i.stock * i.cost), 0).toFixed(2)}</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Stock</th>
+              <th>Unit</th>
+              <th>Cost/Unit</th>
+              <th>Total Value</th>
+              <th>Threshold</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${inventory.map(item => `
+              <tr class="${item.stock < item.threshold ? 'low-stock' : ''}">
+                <td>${item.name}</td>
+                <td>${item.stock}</td>
+                <td>${item.unit}</td>
+                <td>Rs. ${item.cost.toFixed(2)}</td>
+                <td>Rs. ${(item.stock * item.cost).toFixed(2)}</td>
+                <td>${item.threshold}</td>
+                <td>${item.stock < item.threshold ? '⚠️ Low Stock' : '✅ In Stock'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <p>© 2025 Toss in F11 - Pizza Restaurant Inventory Management System</p>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-lg mb-6">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={exportToExcel}
+          disabled={!isXlsxLoaded} // Disable button until library is loaded
+          className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FileSpreadsheet size={20} />
+          {isXlsxLoaded ? 'Export to Excel' : 'Loading Export...'}
+        </button>
+        <button
+          onClick={exportToPDF}
+          className="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 font-semibold"
+        >
+          <FileText size={20} />
+          Export to PDF
+        </button>
+      </div>
+      <p className="text-xs text-gray-500 mt-2 text-center">Download your inventory data as Excel or print as PDF</p>
+    </div>
+  );
+};
+
 const LowStockAlertPanel = ({ inventory }) => {
   const lowStockItems = inventory.filter(item => item.stock < item.threshold);
   
@@ -321,13 +540,52 @@ export default function PizzaInventorySystem() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [notifiedItems, setNotifiedItems] = useState(new Set());
+  
+  // Search and Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [sortType, setSortType] = useState('name-asc');
+
+  // State to track if XLSX script is loaded
+  const [isXlsxLoaded, setIsXlsxLoaded] = useState(false);
+
+  // Dynamically load the XLSX script
+  useEffect(() => {
+    const scriptId = 'xlsx-script';
+    // Check if script is already in the document
+    if (document.getElementById(scriptId)) {
+      if (window.XLSX) {
+        setIsXlsxLoaded(true); // Already loaded
+      }
+      return; // Script is already added or loading
+    }
+
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.full.min.js';
+    script.async = true;
+    script.onload = () => {
+      setIsXlsxLoaded(true); // Set loaded state to true
+    };
+    script.onerror = () => {
+      console.error('Failed to load the XLSX library.');
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      // Clean up the script tag if the component unmounts
+      const existingScript = document.getElementById(scriptId);
+      if (existingScript) {
+        document.body.removeChild(existingScript);
+      }
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   // Check for low stock and send notifications
   useEffect(() => {
     const lowStockItems = inventory.filter(item => item.stock < item.threshold);
     
     lowStockItems.forEach(item => {
-      // Only notify once per item until stock is restocked
       if (!notifiedItems.has(item.id) && 'Notification' in window && Notification.permission === 'granted') {
         new Notification('🍕 Low Stock Alert!', {
           body: `${item.name} is running low! Only ${item.stock} ${item.unit} left (threshold: ${item.threshold} ${item.unit})`,
@@ -339,7 +597,6 @@ export default function PizzaInventorySystem() {
       }
     });
     
-    // Reset notification if stock is restocked
     inventory.forEach(item => {
       if (item.stock >= item.threshold && notifiedItems.has(item.id)) {
         setNotifiedItems(prev => {
@@ -350,6 +607,61 @@ export default function PizzaInventorySystem() {
       }
     });
   }, [inventory, notifiedItems]);
+
+  // Filter and Search Logic
+  const getFilteredInventory = () => {
+    let filtered = [...inventory];
+
+    // Apply search
+    if (searchTerm) {
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply filter type
+    switch (filterType) {
+      case 'lowStock':
+        filtered = filtered.filter(item => item.stock < item.threshold);
+        break;
+      case 'inStock':
+        filtered = filtered.filter(item => item.stock >= item.threshold);
+        break;
+      case 'highValue':
+        filtered = filtered.filter(item => (item.stock * item.cost) >= 100);
+        break;
+      default:
+        break;
+    }
+
+    // Apply sorting
+    switch (sortType) {
+      case 'name-asc':
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'name-desc':
+        filtered.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case 'stock-asc':
+        filtered.sort((a, b) => a.stock - b.stock);
+        break;
+      case 'stock-desc':
+        filtered.sort((a, b) => b.stock - a.stock);
+        break;
+      case 'value-asc':
+        filtered.sort((a, b) => (a.stock * a.cost) - (b.stock * b.cost));
+        break;
+      case 'value-desc':
+        filtered.sort((a, b) => (b.stock * b.cost) - (a.stock * a.cost));
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  };
+
+  const filteredInventory = getFilteredInventory();
 
   const handleUpdateStock = (id, updates) => {
     setInventory(prev => prev.map(item => 
@@ -380,18 +692,38 @@ export default function PizzaInventorySystem() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">🍕 Toss in F11 - Inventory Manager</h1>
-          <p className="text-gray-600">AI-powered Inventory Management for your Pizza Restaurant</p>
+          <p className="text-gray-600">AI-powered inventory management for your pizza restaurant</p>
         </div>
 
         <Dashboard inventory={inventory} />
         
         <LowStockAlertPanel inventory={inventory} />
 
+        {/* Pass loading state to ExportButtons */}
+        <ExportButtons inventory={inventory} isXlsxLoaded={isXlsxLoaded} />
+
+        {/* Search and Filter */}
+        <SearchAndFilter
+          inventory={inventory}
+          onFilterChange={setSortType}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterType={filterType}
+          setFilterType={setFilterType}
+        />
+
         <AIAgentInput inventory={inventory} onUpdateStock={handleUpdateStock} />
 
         <div className="bg-white p-6 rounded-lg shadow-lg">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-800">Current Inventory</h2>
+            <h2 className="text-2xl font-semibold text-gray-800">
+              Current Inventory 
+              {filteredInventory.length !== inventory.length && (
+                <span className="text-sm text-gray-500 ml-2">
+                  ({filteredInventory.length} of {inventory.length} items)
+                </span>
+              )}
+            </h2>
             <button
               onClick={() => setShowAddForm(true)}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center"
@@ -401,15 +733,15 @@ export default function PizzaInventorySystem() {
             </button>
           </div>
 
-          {inventory.length === 0 ? (
+          {filteredInventory.length === 0 ? (
             <div className="text-center py-12">
-              <Boxes size={48} className="mx-auto text-gray-400 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-800">Inventory is Empty</h3>
-              <p className="text-gray-500 mt-2">Add items to get started</p>
+              <Search size={48} className="mx-auto text-gray-400 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-800">No Items Found</h3>
+              <p className="text-gray-500 mt-2">Try adjusting your search or filters</p>
             </div>
           ) : (
             <ul className="space-y-4">
-              {inventory.map(item => (
+              {filteredInventory.map(item => (
                 <InventoryItem
                   key={item.id}
                   item={item}
